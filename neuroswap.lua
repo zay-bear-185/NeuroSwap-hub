@@ -23,6 +23,7 @@ local AimbotEnabled = false
 local AimbotFOV = 50
 local AimbotKeybind = Enum.UserInputType.MouseButton2
 local FOVCircleVisible = true
+local VisibilityCheck = false
 
 local SpeedEnabled = false
 local SpeedValue = 50
@@ -54,7 +55,22 @@ FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.
 local function GetCharacter(player)
     return player and player.Character
 end
+local function IsVisible(part)
+    local origin = Camera.CFrame.Position
+    local direction = (part.Position - origin)
 
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+    local result = workspace:Raycast(origin, direction, rayParams)
+
+    if result and result.Instance then
+        return result.Instance:IsDescendantOf(part.Parent)
+    end
+
+    return false
+end
 local function GetRootPart(player)
     local char = GetCharacter(player)
     return char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
@@ -98,6 +114,7 @@ local function GetClosestPlayerToCursor()
 
         local screenPos, onScreen = WorldToScreen(head.Position)
         if not onScreen then continue end
+if VisibilityCheck and not IsVisible(head) then continue end
 
         local dist = (screenPos - center).Magnitude
         if dist < AimbotFOV and dist < closestDist then
@@ -133,7 +150,8 @@ local function DoAimbot()
     local head = GetHead(target)
     if not head then return end
 
-    Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+    local targetCF = CFrame.new(Camera.CFrame.Position, head.Position)
+Camera.CFrame = Camera.CFrame:Lerp(targetCF, 0.15)
 end
 
 -- =====================
@@ -144,7 +162,7 @@ local function CreateESPBox(player)
     local box = Drawing.new("Square")
     box.Visible = false
     box.Color = Color3.fromRGB(255, 50, 50)
-    box.Thickness = 1.5
+    box.Thickness = 1
     box.Filled = false
 
     local nameLabel = Drawing.new("Text")
@@ -351,7 +369,7 @@ local Window = Rayfield:CreateWindow({
     Name = "NeuroSwap",
     LoadingTitle = "NeuroSwap",
     LoadingSubtitle = "Loading Features...",
-    Theme = "Default",
+    Theme = "Ocean", -- cleaner blue theme
     DisableRayfieldPrompts = false,
     DisableBuildWarnings = false,
     ConfigurationSaving = {
@@ -366,63 +384,45 @@ local Window = Rayfield:CreateWindow({
 
 local AimbotTab = Window:CreateTab("Aimbot", "crosshair")
 
+-- Enable Aimbot
 AimbotTab:CreateToggle({
     Name = "Enable Aimbot",
     CurrentValue = false,
-    Flag = "AimbotToggle",
     Callback = function(val)
         AimbotEnabled = val
         FOVCircle.Visible = val and FOVCircleVisible
     end,
 })
 
+-- Visibility Check
+AimbotTab:CreateToggle({
+    Name = "Visibility Check",
+    CurrentValue = false,
+    Callback = function(val)
+        VisibilityCheck = val
+    end,
+})
+
+-- FOV Circle
 AimbotTab:CreateToggle({
     Name = "Show FOV Circle",
     CurrentValue = true,
-    Flag = "FOVCircleToggle",
     Callback = function(val)
         FOVCircleVisible = val
         FOVCircle.Visible = AimbotEnabled and val
     end,
 })
 
+-- FOV Size
 AimbotTab:CreateSlider({
     Name = "FOV Size",
     Range = {50, 500},
     Increment = 5,
-    Suffix = "px",
     CurrentValue = 50,
-    Flag = "AimbotFOVSlider",
     Callback = function(val)
         AimbotFOV = val
-        FOVCircle.Radius = val
     end,
 })
-
--- Keybind selector using Dropdown
-AimbotTab:CreateDropdown({
-    Name = "Aimbot Keybind",
-    Options = {"MouseButton2 (Default)", "MouseButton1", "E", "Q", "F", "Z", "X", "C", "V"},
-    CurrentOption = {"MouseButton2 (Default)"},
-    MultipleOptions = false,
-    Flag = "AimbotKeybindDropdown",
-    Callback = function(selected)
-        local option = selected[1] or selected
-        if option == "MouseButton2 (Default)" then
-            AimbotKeybind = Enum.UserInputType.MouseButton2
-        elseif option == "MouseButton1" then
-            AimbotKeybind = Enum.UserInputType.MouseButton1
-        elseif option == "E" then AimbotKeybind = Enum.KeyCode.E
-        elseif option == "Q" then AimbotKeybind = Enum.KeyCode.Q
-        elseif option == "F" then AimbotKeybind = Enum.KeyCode.F
-        elseif option == "Z" then AimbotKeybind = Enum.KeyCode.Z
-        elseif option == "X" then AimbotKeybind = Enum.KeyCode.X
-        elseif option == "C" then AimbotKeybind = Enum.KeyCode.C
-        elseif option == "V" then AimbotKeybind = Enum.KeyCode.V
-        end
-    end,
-})
-
 AimbotTab:CreateParagraph({
     Title = "Aimbot Info",
     Content = "Hold your selected keybind to activate aimbot. Targets the closest enemy within the FOV circle. Default keybind: MouseButton2 (Right Click).",
